@@ -1,4 +1,6 @@
 # EQEmu-Docs-Browser
+View web site here: http://tfsg.dyndns.org/EQEmu-Docs/
+
 Built a 2-file standalone browser for the EQEmu docs tree:
 
 - index.html (18 KB)
