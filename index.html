@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EQEmu Docs Browser</title>
+<style>
+  :root{
+    --bg:#12151a; --panel:#181c23; --panel2:#1e232c; --line:#2a313d;
+    --fg:#dfe4ec; --dim:#8b95a7; --acc:#6ea8fe; --acc2:#ffd479;
+    --ok:#6fcf97; --warn:#f2a25c; --mono:ui-monospace,"Cascadia Code",Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{position:sticky;top:0;z-index:20;background:var(--panel);
+         border-bottom:1px solid var(--line);padding:10px 14px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.3px}
+  h1 span{color:var(--dim);font-weight:400}
+  .grow{flex:1 1 260px}
+  input[type=search],input[type=text],select{
+    background:var(--panel2);border:1px solid var(--line);color:var(--fg);
+    border-radius:6px;padding:7px 10px;font-size:13px;outline:none;width:100%}
+  input:focus,select:focus{border-color:var(--acc)}
+  .tabs{display:flex;gap:4px;margin-top:9px;flex-wrap:wrap}
+  .tab{background:transparent;border:1px solid transparent;color:var(--dim);
+       padding:5px 12px;border-radius:6px;cursor:pointer;font-size:13px}
+  .tab:hover{color:var(--fg);background:var(--panel2)}
+  .tab.on{background:var(--acc);color:#0d1117;font-weight:600}
+  main{display:grid;grid-template-columns:270px 1fr;gap:0;height:calc(100vh - 92px)}
+  aside{border-right:1px solid var(--line);overflow:auto;padding:10px;background:var(--panel)}
+  aside h2{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);
+           margin:12px 4px 6px}
+  aside h2:first-child{margin-top:2px}
+  .navitem{display:block;width:100%;text-align:left;background:transparent;border:0;
+           color:var(--fg);padding:5px 8px;border-radius:5px;cursor:pointer;font-size:13px;
+           overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .navitem:hover{background:var(--panel2)}
+  .navitem.on{background:var(--panel2);color:var(--acc2);font-weight:600}
+  .navitem .c{color:var(--dim);font-size:11px;margin-left:5px}
+  section{overflow:auto;padding:16px 20px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:9px;
+        padding:14px 16px;margin-bottom:12px;max-width:100%}
+  .card h3{margin:0 0 4px;font-size:15px;font-family:var(--mono);color:var(--acc)}
+  .card h3 .tag{font-family:system-ui;font-size:11px;color:var(--dim);
+                border:1px solid var(--line);border-radius:20px;padding:1px 8px;margin-left:8px}
+  .muted{color:var(--dim);font-size:12.5px}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+  th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px}
+  td.n{font-family:var(--mono);color:var(--acc2);white-space:nowrap}
+  td.d{color:var(--dim)}
+  .pill{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:20px;
+        border:1px solid var(--line);color:var(--dim)}
+  .pill.no{color:var(--warn);border-color:#4a3a2a}
+  .chip{display:inline-block;font-size:12px;color:var(--acc);border-bottom:1px dotted var(--acc);
+        text-decoration:none;cursor:help}
+  .chip:hover{color:var(--acc2);border-bottom-color:var(--acc2)}
+  mark{background:#5a4a12;color:#ffe9a8;border-radius:2px;padding:0 1px}
+  .rel{font-family:var(--mono);font-size:12px;color:var(--dim);padding:2px 0}
+  .rel b{color:var(--acc2);font-weight:600}
+  .rel a{color:var(--acc);text-decoration:none}
+  .rel a:hover{text-decoration:underline}
+  .res{padding:11px 0;border-bottom:1px solid var(--line)}
+  .res h4{margin:0 0 3px;font-size:14px}
+  .res .path{font-family:var(--mono);font-size:11.5px;color:var(--acc)}
+  .res .snip{color:var(--dim);font-size:12.5px;margin-top:4px}
+  .res .snip mark{background:#3c2f10}
+  .res[data-doc]{cursor:pointer;position:relative;padding-right:70px}
+  .res[data-doc]:hover{background:var(--panel2)}
+  .res[data-doc]:hover h4{color:var(--acc2)}
+  .openhint{position:absolute;right:0;top:12px;color:var(--acc);font-size:12px;opacity:0;
+             transition:opacity .12s}
+  .res[data-doc]:hover .openhint{opacity:1}
+
+  /* doc reader */
+  .readerbar{display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--line);
+             padding-bottom:8px;margin-bottom:6px}
+  .backbtn{background:var(--panel2);border:1px solid var(--line);color:var(--fg);
+           padding:4px 12px;border-radius:6px;cursor:pointer;font-size:13px}
+  .backbtn:hover{border-color:var(--acc);color:var(--acc)}
+  .readerpath{font-family:var(--mono);font-size:11.5px;color:var(--dim);
+              overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .reader{max-width:980px}
+  .reader h1{font-size:22px;margin:10px 0 12px;color:var(--fg)}
+  .reader h2{font-size:18px;margin:20px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px}
+  .reader h3{font-size:15px;margin:16px 0 6px}
+  .reader h4{font-size:13.5px;margin:12px 0 5px;color:var(--dim)}
+  .reader p{margin:7px 0;color:var(--fg)}
+  .reader ul,.reader ol{margin:7px 0 7px 22px;color:var(--fg)}
+  .reader li{margin:3px 0}
+  .reader code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
+               padding:1px 5px;font-family:var(--mono);font-size:12.5px;color:var(--acc2)}
+  .reader pre.code{background:var(--panel2);border:1px solid var(--line);border-radius:7px;
+                   padding:11px 13px;overflow:auto;margin:9px 0;max-width:100%}
+  .reader pre.code code{background:none;border:0;padding:0;color:var(--fg);font-size:12.5px;
+                        line-height:1.45;white-space:pre}
+  .reader blockquote{margin:9px 0;padding:6px 12px;border-left:3px solid var(--acc);
+                     background:var(--panel2);color:var(--dim)}
+  .reader hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+  .reader{max-width:980px;min-width:0;overflow-wrap:break-word}
+  .reader table.md{border-collapse:collapse;margin:10px 0;font-size:12.5px;width:auto;
+                   max-width:100%;display:block;overflow-x:auto}
+  .reader table.md td{border:1px solid var(--line);padding:4px 9px;white-space:nowrap}
+  .reader table.md tr:first-child td{background:var(--panel2);color:var(--dim);
+                                     font-weight:600;text-transform:uppercase;font-size:11px}
+  .reader table.md tbody,.reader table.md thead{display:table;width:100%;table-layout:auto}
+  .reader a{color:var(--acc);text-decoration:none}
+  .reader a:hover{text-decoration:underline}
+  .reader a.docref{border-bottom:1px dotted var(--acc)}
+  .imgph{color:var(--dim);font-style:italic;font-size:12px}
+  .meta{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--acc);
+        border-radius:7px;padding:9px 13px;margin:8px 0 14px}
+  .metarow{display:flex;gap:10px;font-size:12.5px;padding:2px 0}
+  .metak{color:var(--dim);min-width:96px;flex:0 0 auto;text-transform:uppercase;font-size:11px;
+        letter-spacing:.4px;padding-top:1px}
+  .metav{color:var(--fg)}
+  .toc{font-size:12.5px;color:var(--dim);padding:2px 6px;cursor:default}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(20px);
+         background:var(--panel2);border:1px solid var(--acc);color:var(--fg);
+         padding:9px 16px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;
+         transition:opacity .18s,transform .18s;z-index:60;max-width:70%}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .empty{color:var(--dim);padding:40px;text-align:center}
+  .sticky{position:sticky;top:0;background:var(--bg);padding:4px 0 8px;z-index:5}
+  .crumb{color:var(--dim);font-size:12px;margin-bottom:8px}
+  .crumb a{color:var(--acc);text-decoration:none}
+  .crumb b{color:var(--fg)}
+  .sc{font-family:var(--mono);font-size:12.5px;color:var(--fg);margin:6px 0}
+  .sc .ln{color:var(--dim);user-select:none;display:inline-block;width:42px;text-align:right;
+          margin-right:12px}
+  .sc .ct{color:var(--dim)}
+  .hl{background:#5a4a12;color:#ffe9a8;border-radius:2px}
+  .tog{cursor:pointer;color:var(--acc);font-size:12px;user-select:none}
+  .cnt{color:var(--dim);font-size:12px;margin-left:auto}
+  @media(max-width:820px){main{grid-template-columns:1fr;height:auto}
+    aside{max-height:230px;border-right:0;border-bottom:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <h1>EQEmu Docs Browser <span id="stat"></span></h1>
+    <div class="grow"><input type="search" id="q" placeholder="Search tables, columns, relationships and documentation..." autocomplete="off"></div>
+    <select id="cat" style="width:auto;min-width:170px"><option value="">All categories</option></select>
+  </div>
+  <div class="tabs">
+    <button class="tab on" data-v="all">Everything</button>
+    <button class="tab" data-v="schema">Schema</button>
+    <button class="tab" data-v="docs">Documentation</button>
+    <button class="tab" data-v="rel">Relationships</button>
+  </div>
+</header>
+<main>
+  <aside id="side"></aside>
+  <section id="out"></section>
+</main>
+<script src="data.js"></script>
+<script>
+(function(){
+"use strict";
+var D = window.EQDOCS;
+var $ = function(s){return document.querySelector(s)};
+var out = $("#out"), side = $("#side"), qIn = $("#q"), catSel = $("#cat");
+var view = "all", query = "", cat = "", relCat = "", docSec = "";
+
+$("#stat").textContent = D.stats.tables+" tables · "+D.stats.docs+" pages · "+D.stats.columns+" columns · "+D.stats.rels+" links";
+
+/* ---------- populate category filter ---------- */
+var catNames = Object.keys(D.cats).sort();
+catNames.forEach(function(c){
+  var o = document.createElement("option"); o.value=c; o.textContent=c; catSel.appendChild(o);
+});
+
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+/* ---------- toast ---------- */
+var toastEl = null, toastTimer = null;
+function toast(msg){
+  if(!toastEl){
+    toastEl = document.createElement("div");
+    toastEl.className = "toast";
+    document.body.appendChild(toastEl);
+  }
+  toastEl.textContent = msg;
+  toastEl.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ toastEl.classList.remove("on"); }, 3200);
+}
+
+/* ---------- minimal markdown -> HTML (for the doc reader) ---------- */
+function mdToHtml(src){
+  var lines = String(src||"").replace(/\r\n/g,"\n").split("\n");
+  var out = [], inFence = false, fenceLang = "", listType = null, inTable = false, tbl = [];
+
+  function closeList(){ if(listType){ out.push("</"+listType+">"); listType = null; } }
+  function closeTable(){ if(inTable){ out.push(tbl.join("")); tbl = []; inTable = false; } }
+  function inline(s){
+    s = esc(s);
+    s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+    s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<i>$2</i>");
+    // links: [label](href) - http(s) -> target blank, relative -> local doc
+    s = s.replace(/\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, function(m,label,href){
+      if(/^https?:/i.test(href)){
+        return "<a href='"+href+"' target='_blank' rel='noopener'>"+label+"</a>";
+      }
+      if(/^#/.test(href)){ return "<a href='"+href+"'>"+label+"</a>"; }
+      return "<a class='docref' data-doc='"+href.replace(/'/g,"&#39;")+"'>"+label+"</a>";
+    });
+    s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, "<span class='imgph'>[image: $1]</span>");
+    return s;
+  }
+
+  for(var i=0;i<lines.length;i++){
+    var L = lines[i];
+    var fm = /^```(\w*)\s*$/.exec(L);
+    if(fm){
+      if(!inFence){
+        closeList(); closeTable();
+        inFence = true; fenceLang = fm[1]||"";
+        out.push("<pre class='code"+(fenceLang?" lang-"+fenceLang:"")+"'><code>");
+      } else {
+        out.push("</code></pre>");
+        inFence = false;
+      }
+      continue;
+    }
+    if(inFence){ out.push(esc(L)+"\n"); continue; }
+
+    // table row
+    if(/^\s*\|.*\|\s*$/.test(L)){
+      var cells = L.trim().replace(/^\||\|$/g,"").split("|").map(function(c){return c.trim()});
+      var isSep = cells.every(function(c){ return /^:?-{2,}:?$/.test(c); });
+      if(isSep){ continue; }
+      if(!inTable){ closeList(); inTable = true; tbl.push("<table class='md'><thead><tr>"); }
+      tbl.push("<tr>"+cells.map(function(c){return "<td>"+inline(c)+"</td>"}).join("")+"</tr>");
+      continue;
+    }
+    closeTable();
+
+    var h = /^(#{1,6})\s+(.*)$/.exec(L);
+    if(h){ closeList(); out.push("<h"+h[1].length+">"+inline(h[2])+"</h"+h[1].length+">"); continue; }
+
+    if(/^\s*>\s?/.test(L)){ closeList(); out.push("<blockquote>"+inline(L.replace(/^\s*>\s?/,""))+"</blockquote>"); continue; }
+    if(/^\s*([-*_])\s*\1\s*\1[\s\1]*$/.test(L)){ closeList(); out.push("<hr>"); continue; }
+    if(/^\s*-\s+/.test(L)){
+      if(listType!=="ul"){ closeList(); out.push("<ul>"); listType="ul"; }
+      out.push("<li>"+inline(L.replace(/^\s*-\s+/,""))+"</li>"); continue;
+    }
+    if(/^\s*\d+[.)]\s+/.test(L)){
+      if(listType!=="ol"){ closeList(); out.push("<ol>"); listType="ol"; }
+      out.push("<li>"+inline(L.replace(/^\s*\d+[.)]\s+/,""))+"</li>"); continue;
+    }
+    closeList();
+    if(L.trim()!==""){ out.push("<p>"+inline(L)+"</p>"); }
+  }
+  closeList(); closeTable();
+  if(inFence) out.push("</code></pre>");
+  return out.join("");
+}
+
+function descHtml(c, ts){
+  // render a column description, turning embedded doc links into chips
+  var links = c.k || [];
+  var text = c.d || "";
+  if(!links.length) return hl(text, ts);
+  var out = "";
+  var rest = text;
+  links.forEach(function(L){
+    var i = rest.indexOf(L.l);
+    if(i >= 0){
+      out += hl(rest.substring(0,i), ts);
+      out += "<a class='chip' href='"+esc(L.h)+"'>"+hl(L.l,ts)+"</a>";
+      rest = rest.substring(i + L.l.length);
+    }
+  });
+  out += hl(rest, ts);
+  return out;
+}
+function hl(text, terms){
+  if(!terms.length) return esc(text);
+  var t = esc(text);
+  terms.forEach(function(term){
+    var re = new RegExp("("+term.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")","gi");
+    t = t.replace(re,"<mark>$1</mark>");
+  });
+  return t;
+}
+function terms(){ return query.trim().toLowerCase().split(/\s+/).filter(Boolean); }
+
+/* ---------- search over all corpus ---------- */
+function searchAll(ts){
+  var res = [];
+  Object.keys(D.tables).forEach(function(t){
+    var cols = D.tables[t];
+    var hitT = t.toLowerCase().indexOf(query) >= 0;
+    var hitC = cols.filter(function(c){
+      return c.n.toLowerCase().indexOf(query) >= 0 ||
+             (c.d && c.d.toLowerCase().indexOf(query) >= 0);
+    });
+    if(hitT || hitC.length) res.push({k:"table", t:t, cols:cols, hitC:hitC, score:(hitT?2:0)+hitC.length});
+  });
+  D.docs.forEach(function(d){
+    var h = d.t.toLowerCase().indexOf(query) >= 0 ||
+            d.p.toLowerCase().indexOf(query) >= 0 ||
+            d.x.toLowerCase().indexOf(query) >= 0;
+    if(h) res.push({k:"doc", d:d, score:(d.t.toLowerCase().indexOf(query)>=0?3:1)});
+  });
+  (D.relOut && Object.keys(D.relOut)).forEach(function(t){
+    D.relOut[t].forEach(function(r){
+      var s = (r.fc+" "+r.tc+" "+r.f+" "+r.t).toLowerCase();
+      if(s.indexOf(query) >= 0) res.push({k:"rel", r:r, score:1});
+    });
+  });
+  res.sort(function(a,b){return b.score-a.score});
+  return res;
+}
+
+/* ---------- renderers ---------- */
+function tableCard(t, cols, ts, hitC){
+  var cat = D.tableCat[t] || "";
+  var h = "<div class='card'><h3>"+hl(t,ts)+
+    (cat?"<span class='tag'>"+esc(cat)+"</span>":"")+"</h3>";
+  h += "<div class='muted'>"+cols.length+" columns</div>";
+  var show = (hitC && hitC.length) ? hitC : cols;
+  if(hitC && hitC.length) h += "<div class='muted' style='margin-top:4px'>matching: "+hitC.length+"</div>";
+  h += "<table><thead><tr><th>#</th><th>Column</th><th>Type</th><th>Null</th><th>Description</th></tr></thead><tbody>";
+  show.forEach(function(c){
+    h += "<tr><td class='muted'>"+c.p+"</td><td class='n'>"+hl(c.n,ts)+"</td>"+
+         "<td class='d'>"+esc(c.t)+"</td>"+
+         "<td><span class='pill"+(c.nul==="YES"?"":" no")+"'>"+esc(c.nul||"-")+"</span></td>"+
+         "<td class='d'>"+descHtml(c,ts)+"</td></tr>";
+  });
+  h += "</tbody></table>";
+  var rels = D.relOut[t] || [];
+  if(rels.length){
+    h += "<div style='margin-top:10px'><div class='muted' style='margin-bottom:4px'>Relationships</div>";
+    rels.forEach(function(r){
+      h += "<div class='rel'>"+esc(r.c)+" <b>"+esc(r.f)+"."+esc(r.fc)+"</b> &rarr; "+
+           "<a href='#t="+encodeURIComponent(r.t)+"'>"+esc(r.t)+"."+esc(r.tc)+"</a></div>";
+    });
+    h += "</div>";
+  }
+  h += "</div>";
+  return h;
+}
+
+function relCard(r, ts){
+  return "<div class='card'><h3>"+hl(r.f+"."+r.fc,ts)+" <span class='tag'>"+esc(r.c)+"</span></h3>"+
+    "<div class='rel'>&rarr; <a href='#t="+encodeURIComponent(r.t)+"'>"+esc(r.t)+"."+esc(r.tc)+"</a></div></div>";
+}
+
+function docCard(d, ts){
+  var h = "<div class='res' data-doc='"+esc(d.p)+"'>"+
+    "<h4>"+hl(d.t,ts)+"</h4><div class='path'>"+hl(d.p,ts)+"</div>";
+  if(d.h && d.h.length){
+    h += "<div class='muted' style='margin-top:3px'>"+d.h.slice(0,6).map(function(x){
+      return (x.l>1?"&nbsp;".repeat((x.l-1)*2):"")+hl(x.t,ts);
+    }).join(" · ")+"</div>";
+  }
+  var i = d.x.toLowerCase().indexOf(query);
+  if(i >= 0){
+    var s = Math.max(0,i-90);
+    h += "<div class='snip'>…"+hl(d.x.substr(s,260),ts)+"…</div>";
+  } else {
+    h += "<div class='snip'>"+d.n.toLocaleString()+" chars of content</div>";
+  }
+  return h+"<div class='openhint'>Open →</div></div>";
+}
+
+/* ---------- full doc text (headings + prose) ---------- */
+function docFull(d, ts){
+  var h = "<div class='card'><h3 style='font-family:system-ui'>"+esc(d.t)+"</h3>"+
+          "<div class='path'>"+esc(d.p)+"</div>";
+  if(d.h && d.h.length){
+    h += "<div style='margin-top:10px'>";
+    d.h.forEach(function(x){
+      h += "<div style='margin:"+(x.l===1?"10px":"5px")+" 0 3px "+((x.l-1)*14)+"px;"+
+           "font-weight:"+(x.l<=2?"600":"400")+";color:"+(x.l<=2?"var(--fg)":"var(--dim)")+
+           ";font-size:"+(14-x.l)+"px'>"+hl(x.t,ts)+"</div>";
+    });
+    h += "</div>";
+  }
+  h += "<div class='muted' style='margin-top:8px'>"+d.n.toLocaleString()+
+       " characters of prose extracted for search. Full markdown source: "+esc(d.p)+"</div></div>";
+  return h;
+}
+
+/* ---------- doc reader: full rendered markdown ---------- */
+var docIndex = {};
+D.docs.forEach(function(d){ docIndex[d.p] = d; });
+
+function resolveDocRef(base, href){
+  // resolve a relative markdown link against the current doc's folder
+  var h = href.split("#")[0];
+  if(!h) return null;
+  if(/^https?:/i.test(h)) return null;
+  var dir = base.split("/").slice(0,-1);
+  var parts = h.split("/");
+  for(var i=0;i<parts.length;i++){
+    if(parts[i]==="." || parts[i]===""){ continue; }
+    if(parts[i]===".."){ dir.pop(); }
+    else { dir.push(parts[i]); }
+  }
+  var p = dir.join("/");
+  if(docIndex[p]) return p;
+  // try with .md appended
+  if(docIndex[p+".md"]) return p+".md";
+  // try case-insensitive match on the tail
+  var tail = parts[parts.length-1].toLowerCase();
+  for(var k in docIndex){
+    if(k.toLowerCase().slice(-tail.length) === tail) return k;
+  }
+  return null;
+}
+
+function openDoc(path, ts){
+  var d = docIndex[path];
+  if(!d){
+    out.innerHTML = "<div class='card'><h3 style='font-family:system-ui'>Document not found</h3>"+
+      "<div class='muted'>No embedded document at <b>"+esc(path)+"</b>.</div></div>";
+    return;
+  }
+  var body = mdToHtml(d.m || "");
+  var fmHtml = "";
+  if(d.fm && Object.keys(d.fm).length){
+    fmHtml = "<div class='meta'>";
+    Object.keys(d.fm).forEach(function(k){
+      var v = d.fm[k];
+      if(v === null || v === undefined || v === "") return;
+      if(typeof v === "object"){ v = JSON.stringify(v); }
+      fmHtml += "<div class='metarow'><span class='metak'>"+esc(k)+"</span><span class='metav'>"+
+                hl(String(v), ts)+"</span></div>";
+    });
+    fmHtml += "</div>";
+  }
+  var html = "<div class='sticky readerbar'>"+
+      "<button class='backbtn' id='docback'>← Back</button>"+
+      "<span class='readerpath'>"+esc(d.p)+"</span>"+
+      "<span class='cnt'>"+d.n.toLocaleString()+" chars</span></div>"+
+      "<article class='reader'>"+fmHtml+body+"</article>";
+  out.innerHTML = html;
+  side.innerHTML = "<h2>In this page</h2>"+
+    (d.h&&d.h.length ? d.h.map(function(x){
+      return "<div class='toc' style='padding-left:'+((x.l-1)*10)+'px'>"+esc(x.t)+"</div>";
+    }).join("") : "<div class='muted' style='padding:4px 8px'>No headings</div>")+
+    "<h2>Other pages</h2>"+
+    "<div class='muted' style='padding:4px 8px'>"+D.docs.length+" pages available</div>";
+  out.scrollTop = 0;
+  // highlight the search term in the rendered article
+  if(ts && ts.length){
+    var art = out.querySelector(".reader");
+    var nodes = [];
+    var walker = document.createTreeWalker(art, NodeFilter.SHOW_TEXT, null);
+    var n;
+    while((n = walker.nextNode())){
+      if(n.parentNode && n.parentNode.nodeName === "MARK") continue;
+      nodes.push(n);
+    }
+    nodes.forEach(function(node){
+      var t = node.nodeValue;
+      var lower = t.toLowerCase();
+      var hit = false;
+      ts.forEach(function(term){ if(lower.indexOf(term) >= 0) hit = true; });
+      if(!hit) return;
+      var frag = document.createDocumentFragment();
+      var idx = 0;
+      while(idx < t.length){
+        var best = -1, bestLen = 0, bestTerm = null;
+        ts.forEach(function(term){
+          var i = lower.indexOf(term, idx);
+          if(i >= 0 && (best < 0 || i < best || (i === best && term.length > bestLen))){
+            best = i; bestLen = term.length; bestTerm = term;
+          }
+        });
+        if(best < 0){
+          frag.appendChild(document.createTextNode(t.substr(idx)));
+          break;
+        }
+        if(best > idx) frag.appendChild(document.createTextNode(t.substr(idx, best-idx)));
+        var mk = document.createElement("mark");
+        mk.textContent = t.substr(best, bestLen);
+        frag.appendChild(mk);
+        idx = best + bestLen;
+      }
+      node.parentNode.replaceChild(frag, node);
+    });
+  }
+}
+
+/* ---------- main render ---------- */
+function render(){
+  var ts = terms();
+  // keep the tab strip in sync with the active view
+  document.querySelectorAll(".tab").forEach(function(b){
+    b.classList.toggle("on", b.dataset.v === view);
+  });
+  out.innerHTML = "";
+  side.innerHTML = "";
+
+  if(query.length >= 2){
+    var res = searchAll(query.toLowerCase());
+    var hc = "<div class='sticky'><span class='cnt'>"+res.length+" results for <b>"+esc(query)+"</b></span></div>";
+    var body = "";
+    res.slice(0,400).forEach(function(r){
+      if(r.k === "table") body += tableCard(r.t, r.cols, ts, r.hitC);
+      else if(r.k === "rel") body += relCard(r.r, ts);
+      else body += docCard(r.d, ts);
+    });
+    if(!res.length) body = "<div class='empty'>No matches.</div>";
+    out.innerHTML = hc + body;
+    side.innerHTML = "<h2>Results</h2><div class='muted' style='padding:4px 8px'>"+
+      "Click a table or relationship to jump to its detail view.</div>";
+    return;
+  }
+  if(view === "all"){
+    // landing dashboard
+    var cats = Object.keys(D.cats).sort();
+    var h0 = "<div class='card'><h3 style='font-family:system-ui'>EQEmu documentation browser</h3>"+
+      "<div class='muted'>"+D.stats.tables+" tables · "+D.stats.columns+" columns · "+
+      D.stats.rels+" relationships · "+D.stats.docs+" documentation pages ("+
+      (D.stats.chars/1e6).toFixed(1)+"M chars of searchable prose).</div>"+
+      "<div class='muted' style='margin-top:6px'>Everything is embedded locally - this page makes no network requests.</div></div>";
+    h0 += "<div class='card'><h3 style='font-family:system-ui'>Schema categories</h3><div class='muted'>"+
+          cats.length+" categories. Click one to list its tables.</div>";
+    cats.forEach(function(c){
+      h0 += "<button class='navitem' style='display:block;width:100%;text-align:left;background:transparent;"+
+            "border:0;color:var(--fg);padding:4px 6px;cursor:pointer;font-size:13px' data-cat='"+esc(c)+"'>"+
+            esc(c)+"<span class='c' style='float:right;color:var(--dim);font-size:11px'>"+
+            (D.cats[c].length)+"</span></button>";
+    });
+    h0 += "</div>";
+    h0 += "<div class='card'><h3 style='font-family:system-ui'>Quick links</h3>"+
+          "<div class='muted'>Search covers table names, column names and descriptions, foreign keys, "+
+          "and the full text of every documentation page.</div></div>";
+    out.innerHTML = h0;
+    side.innerHTML = "<h2>Views</h2>"+
+      "<button class='navitem' data-v='schema'>Schema tables<span class='c'>"+D.stats.tables+"</span></button>"+
+      "<button class='navitem' data-v='docs'>Documentation<span class='c'>"+D.stats.docs+"</span></button>"+
+      "<button class='navitem' data-v='rel'>Relationships<span class='c'>"+D.stats.rels+"</span></button>";
+    return;
+  }
+
+  if(view === "schema"){
+    var names = Object.keys(D.tables).sort();
+    var h3 = "<h2>Categories</h2>";
+    Object.keys(D.cats).sort().forEach(function(c){
+      h3 += "<button class='navitem"+(cat===c?" on":"")+"' data-cat='"+esc(c)+"'>"+
+            esc(c)+"<span class='c'>"+(D.cats[c].length)+"</span></button>";
+    });
+    h3 += "<button class='navitem' data-cat='' style='margin-top:6px'>Clear filter</button>";
+    side.innerHTML = h3;
+
+    var list = cat ? (D.cats[cat]||[]).slice().sort() : names;
+    var o = "<div class='sticky'><span class='cnt'>"+
+      (cat?esc(cat)+" · ":'')+list.length+" tables</span></div>";
+    list.forEach(function(t){ o += tableCard(t, D.tables[t], [], null); });
+    out.innerHTML = o;
+    return;
+  }
+
+  if(view === "docs"){
+    var h4 = "<h2>Doc sections</h2>";
+    var seen = {};
+    D.docs.forEach(function(d){
+      var top = d.p.split("/")[0];
+      seen[top] = (seen[top]||0)+1;
+    });
+    Object.keys(seen).sort().forEach(function(s){
+      h4 += "<button class='navitem"+(docSec===s?" on":"")+"' data-sec='"+esc(s)+"'>"+
+            esc(s)+"<span class='c'>"+seen[s]+"</span></button>";
+    });
+    side.innerHTML = h4;
+    var dlist = docSec ? D.docs.filter(function(d){ return d.p.split("/")[0] === docSec; }) : D.docs;
+    var od = "<div class='sticky'><span class='cnt'>"+
+      (docSec?esc(docSec)+" · ":"")+dlist.length+" documentation pages</span></div>";
+    dlist.forEach(function(d){ od += docCard(d, []); });
+    out.innerHTML = od;
+    return;
+  }
+
+  if(view === "rel"){
+    var all = [];
+    Object.keys(D.relOut).forEach(function(t){
+      D.relOut[t].forEach(function(r){ all.push(r); });
+    });
+    all.sort(function(a,b){
+      var c = (D.tableCat[a.f]||"").localeCompare(D.tableCat[b.f]||"");
+      return c || a.f.localeCompare(b.f) || a.fc.localeCompare(b.fc);
+    });
+    // sidebar: group relationships by the source table's category
+    var byCat = {};
+    all.forEach(function(r){
+      var c = D.tableCat[r.f] || "(uncategorised)";
+      (byCat[c] = byCat[c] || []).push(r);
+    });
+    var hs = "<h2>By category</h2>";
+    Object.keys(byCat).sort().forEach(function(c){
+      hs += "<button class='navitem' data-rcat='"+esc(c)+"'>"+esc(c)+
+            "<span class='c'>"+byCat[c].length+"</span></button>";
+    });
+    side.innerHTML = hs;
+
+    var shown = all;
+    if(relCat){
+      shown = byCat[relCat] || [];
+    }
+    var orr = "<div class='sticky'><span class='cnt'>"+
+      (relCat?esc(relCat)+" · ":"")+shown.length+" relationships"+
+      (relCat?" <a href='#' id='relclear' style='color:var(--acc)'>clear</a>":"")+
+      "</span></div>";
+    shown.forEach(function(r){ orr += relCard(r, []); });
+    out.innerHTML = orr;
+  }
+}
+
+/* ---------- deep link: #t=table ---------- */
+function handleHash(){
+  var m = /#t=([^&]+)/.exec(location.hash);
+  if(!m) return false;
+  var t = decodeURIComponent(m[1]);
+  view = "schema"; cat = "";
+  document.querySelectorAll(".tab").forEach(function(b){
+    b.classList.toggle("on", b.dataset.v === "schema");
+  });
+  if(!D.tables[t]){
+    out.innerHTML = "<div class='card'><h3 style='font-family:system-ui'>Table not found</h3>"+
+      "<div class='muted'>No table named <b>"+esc(t)+"</b> in the embedded schema reference. "+
+      "It may be a newer table that the docs have not covered yet.</div></div>";
+  } else {
+    out.innerHTML = "<div class='sticky'><span class='cnt'>Table</span></div>" + tableCard(t, D.tables[t], [], null);
+  }
+  side.innerHTML = "<h2>Categories</h2>" + Object.keys(D.cats).sort().map(function(c){
+    return "<button class='navitem' data-cat='"+esc(c)+"'>"+esc(c)+"<span class='c'>"+(D.cats[c].length)+"</span></button>";
+  }).join("");
+  out.scrollTop = 0;
+  return true;
+}
+
+/* ---------- events ---------- */
+qIn.addEventListener("input", function(){ query = qIn.value; render(); });
+catSel.addEventListener("change", function(){ cat = catSel.value; render(); });
+document.querySelectorAll(".tab").forEach(function(b){
+  b.addEventListener("click", function(){
+    view = b.dataset.v;
+    if(view !== "rel") relCat = "";
+    if(view !== "docs") docSec = "";
+    document.querySelectorAll(".tab").forEach(function(x){ x.classList.toggle("on", x === b); });
+    render();
+  });
+});
+side.addEventListener("click", function(e){
+  var rc = e.target.closest("[data-rcat]");
+  if(rc){ relCat = rc.dataset.rcat; render(); return; }
+  var b = e.target.closest("[data-cat]");
+  if(b){
+    cat = b.dataset.cat; catSel.value = cat;
+    if(view === "all"){ view = "schema"; }
+    render();
+    return;
+  }
+  var s = e.target.closest("[data-sec]");
+  if(s){
+    docSec = s.dataset.sec;
+    render();
+    return;
+  }
+  var v = e.target.closest("[data-v]");
+  if(v){
+    view = v.dataset.v;
+    document.querySelectorAll(".tab").forEach(function(x){ x.classList.toggle("on", x.dataset.v === view); });
+    render();
+  }
+});
+out.addEventListener("click", function(e){
+  if(e.target.id === "relclear"){ e.preventDefault(); relCat = ""; render(); return; }
+  if(e.target.id === "docback"){ e.preventDefault(); render(); return; }
+  // in-reader link to another embedded doc
+  var dr = e.target.closest(".docref");
+  if(dr){
+    e.preventDefault();
+    var cur = out.querySelector(".readerpath");
+    var base = cur ? cur.textContent : "";
+    var target = resolveDocRef(base, dr.getAttribute("data-doc"));
+    if(target){ openDoc(target, terms()); }
+    else { toast("That link points outside the embedded docs (or to a file not included)."); }
+    return;
+  }
+  // a documentation result card -> open the reader
+  var rc = e.target.closest("[data-doc]");
+  if(rc && rc.classList.contains("res")){
+    openDoc(rc.getAttribute("data-doc"), terms());
+    return;
+  }
+  var a = e.target.closest("a[href^='#t=']");
+  if(a){ e.preventDefault(); location.hash = a.getAttribute("href"); handleHash(); return; }
+  var b = e.target.closest("[data-cat]");   // category buttons on the dashboard
+  if(b){
+    cat = b.dataset.cat; catSel.value = cat;
+    view = "schema";
+    render();
+    return;
+  }
+});
+window.addEventListener("hashchange", handleHash);
+
+/* ---------- init ---------- */
+if(!handleHash()) render();
+})();
+</script>
+</body>
+</html>
